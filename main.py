@@ -1,6 +1,13 @@
-from tkinter import *
 from tkinter import ttk
-from tkinter import filedialog
+import bitmap
+from tkinter import Tk, mainloop, Canvas, PhotoImage, filedialog
+
+
+def rgb2hex(r, g, b):
+    """
+    Convert an r,g,b colour to a hex code
+    """
+    return "#{:02x}{:02x}{:02x}".format(r, g, b)
 
 
 class Root(Tk):
@@ -15,11 +22,16 @@ class Root(Tk):
         super(Root, self).__init__()
         self.title("BMP compression analyzer")
         self.minsize(640, 400)
+        self.row = 3
 
         self.labelFrame = ttk.LabelFrame(self, text="Open File")
         self.labelFrame.grid(column=0, row=1, padx=20, pady=20)
 
         self.button()
+
+    def get_row(self):
+        self.row += 1
+        return self.row
 
     def button(self):
         self.button = ttk.Button(
@@ -47,8 +59,35 @@ class Root(Tk):
         """
         Print some information about the bmp file
 
+        Shows on the UI bmp
         """
-        pass
+        with open(filename, "rb") as bmp_file:
+            bmp_data = bitmap.Image(bmp_file.read())
+
+            self.show_image(
+                bmp_data.getBitmapWidth(),
+                bmp_data.getBitmapHeight(),
+                bmp_data.getPixels(),
+                self.get_row(),
+                0,
+            )
+
+    def show_image(self, width, height, pixels, row, col):
+        """
+        Add an image to the gui
+        """
+        self.canvas = Canvas(self, width=width, height=height)
+        self.canvas.grid(column=col, row=row)
+
+        img = PhotoImage(width=width, height=height)
+        self.canvas.create_image((width / 2, height / 2), image=img, state="normal")
+        self.canvas.image = img
+
+        for y_index, y in enumerate(pixels):
+            for x_index, x in enumerate(y):
+                blue, green, red = x
+                hex_code = rgb2hex(r=red, g=green, b=blue)
+                img.put(hex_code, (x_index, height - y_index))
 
 
 if __name__ == "__main__":
