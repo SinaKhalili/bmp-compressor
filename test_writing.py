@@ -1,12 +1,28 @@
+import numpy as np
+import cv2
 import bitmap
 import tkinter
+import run_length_encoder
 from tkinter import Canvas, PhotoImage, Tk
+
+import compress_dct
+from constants import *
 
 
 def rgb2hex(r, g, b):
     """
     Convert an r,g,b colour to a hex code
     """
+    r = r if r > 0 else 0
+    g = g if g > 0 else 0
+    b = b if b > 0 else 0
+
+    r = r if r < 255 else 255
+    g = g if g < 255 else 255
+    b = b if b < 255 else 255
+
+    print(r, g, b)
+
     return "#{:02x}{:02x}{:02x}".format(r, g, b)
 
 
@@ -36,66 +52,44 @@ def int_from_bytes(xbytes):
     return int.from_bytes(xbytes, "big")
 
 
-def write_info(width, height, pixels):
-    with open("test.img", "wb") as file_obj:
-        file_obj.write(width.to_bytes(2, "big"))
-        file_obj.write(height.to_bytes(2, "big"))
-
-        for y_index, y in enumerate(pixels):
-            for x_index, x in enumerate(y):
-                blue, green, red = x
-                file_obj.write(blue.to_bytes(1, "big"))
-                file_obj.write(green.to_bytes(1, "big"))
-                file_obj.write(red.to_bytes(1, "big"))
-
-
-def read_info(root):
-    with open("test.img", "rb") as file_obj:
-        bytes_read = file_obj.read()
-
-    # the first four are heigh/width
-    width = int_from_bytes(bytes_read[0:2])
-    height = int_from_bytes(bytes_read[2:4])
-
-    print("Width and height are")
-    print(width)
-    print(height)
-
-    pixel_bytes = bytes_read[4::]
-    all_pixels = []
-    for i in range(0, len(pixel_bytes) - 3, 3):
-        blue = pixel_bytes[i]
-        green = pixel_bytes[i + 1]
-        red = pixel_bytes[i + 2]
-        all_pixels.append([blue, green, red])
-
-    k = 0
-    all_pixels_2d = []
-    for i in range(height):
-        tmp = []
-        for j in range(width):
-            if k != len(all_pixels):
-                tmp.append(all_pixels[k])
-                k += 1
-
-        all_pixels_2d.append(tmp)
-
-    show_image(root, width, height, all_pixels_2d, 1, 0)
-
-
 root = Tk()
 
-with open("./sample_inputs/BIOS.bmp", "rb") as bmp_file:
-    bmp_data = bitmap.Image(bmp_file.read())
 
-    width = bmp_data.getBitmapWidth()
-    height = bmp_data.getBitmapHeight()
-    pixels = bmp_data.getPixels()
-    print("True values:")
-    print(width)
-    print(height)
+def my_compress(filename):
+    """
+    Compresses to the .img format
+    """
+    with open("./sample_inputs/BIOS.bmp", "rb") as bmp_file:
+        bmp_data = bitmap.Image(bmp_file.read())
+        width = bmp_data.getBitmapWidth()
+        height = bmp_data.getBitmapHeight()
+        pixels = bmp_data.getPixels()
 
-    write_info(width, height, pixels)
-    read_info(root)
+        pixels_array = np.array(pixels)
+        blue, green, red = cv2.split(pixels_array)
+
+        (
+            compressed_blues,
+            compressed_greens,
+            compressed_reds,
+        ) = compress_dct.compress_img(
+            blues=blue, greens=green, reds=red, width=width, height=height
+        )
+
+        run_length_encoder.write_matrix(
+            compressed_reds.astype("int8"),
+            compressed_greens.astype("int8"),
+            compressed_blues.astype("int8"),
+            "new.img",
+        )
+
+        new_r, new_g, new_b = run_length_encoder.read_encoded_matrix("nature.img")
+
+        pixels_array_new = compress_dct.decompress_img(new_b, new_g, new_r)
+
+        show_image(root, width, height, pixels_array_new.astype("int16"), 1, 1)
+
+
+my_compress("someting")
 
 root.mainloop()
